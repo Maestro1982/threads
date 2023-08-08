@@ -138,6 +138,11 @@
   @apply focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0 !important;
 }
 
+/* Button */
+.primary-button {
+  @apply bg-primary-500 hover:bg-primary-500/80 !important;
+}
+
 /* Account Profile  */
 .account-form_image-label {
   @apply flex h-24 w-24 items-center justify-center rounded-full bg-dark-4 !important;

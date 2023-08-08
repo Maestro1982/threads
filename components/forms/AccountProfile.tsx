@@ -1,8 +1,10 @@
 'use client';
 
-import { ChangeEvent } from 'react';
+import { ChangeEvent, useState } from 'react';
 import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -10,12 +12,17 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { UserValidation } from '@/lib/validations/user';
+import { isBase64Image } from '@/lib/utils';
+import { useUploadThing } from '@/lib/uploadthing';
+import { updateUser } from '@/lib/actions/user.actions';
 
 interface AccountProfileProps {
   user: {
@@ -30,6 +37,12 @@ interface AccountProfileProps {
 }
 
 const AccountProfile = ({ user, btnTitle }: AccountProfileProps) => {
+  const [files, setFiles] = useState<File[]>([]);
+  const { startUpload } = useUploadThing('media');
+
+  const router = useRouter();
+  const pathname = usePathname();
+
   const form = useForm({
     resolver: zodResolver(UserValidation),
     defaultValues: {
@@ -41,16 +54,54 @@ const AccountProfile = ({ user, btnTitle }: AccountProfileProps) => {
   });
 
   const handleImage = (
-    e: ChangeEvent,
+    e: ChangeEvent<HTMLInputElement>,
     fieldChange: (value: string) => void
   ) => {
     e.preventDefault();
+
+    const fileReader = new FileReader();
+
+    if (e.target.files?.length) {
+      const file = e.target.files[0];
+
+      setFiles(Array.from(e.target.files));
+
+      if (!file.type.includes('image')) return;
+
+      fileReader.onload = (e) => {
+        const imageDataUrl = e.target?.result?.toString() || '';
+        fieldChange(imageDataUrl);
+      };
+      fileReader.readAsDataURL(file);
+    }
   };
 
-  function onSubmit(values: z.infer<typeof UserValidation>) {
-    // Do something with the form values.
-    // ✅ This will be type-safe and validated.
-    console.log(values);
+  async function onSubmit(values: z.infer<typeof UserValidation>) {
+    const blob = values.profile_photo;
+    const isImageChanged = isBase64Image(blob);
+
+    if (isImageChanged) {
+      const imgRes = await startUpload(files);
+
+      if (imgRes && imgRes[0].fileUrl) {
+        values.profile_photo = imgRes[0].fileUrl;
+      }
+    }
+
+    await updateUser({
+      userId: user.id,
+      username: values.username,
+      name: values.name,
+      bio: values.bio,
+      image: values.profile_photo,
+      path: pathname,
+    });
+
+    if (pathname === '/profile/edit') {
+      router.back();
+    } else {
+      router.push('/');
+    }
   }
 
   return (
@@ -93,6 +144,7 @@ const AccountProfile = ({ user, btnTitle }: AccountProfileProps) => {
                   onChange={(e) => handleImage(e, field.onChange)}
                 />
               </FormControl>
+              <FormMessage />
             </FormItem>
           )}
         />
@@ -112,6 +164,7 @@ const AccountProfile = ({ user, btnTitle }: AccountProfileProps) => {
                   {...field}
                 />
               </FormControl>
+              <FormMessage />
             </FormItem>
           )}
         />
@@ -131,6 +184,7 @@ const AccountProfile = ({ user, btnTitle }: AccountProfileProps) => {
                   {...field}
                 />
               </FormControl>
+              <FormMessage />
             </FormItem>
           )}
         />
@@ -150,13 +204,11 @@ const AccountProfile = ({ user, btnTitle }: AccountProfileProps) => {
                   {...field}
                 />
               </FormControl>
+              <FormMessage />
             </FormItem>
           )}
         />
-        <Button
-          type='submit'
-          className='bg-primary-500 hover:bg-primary-500/80'
-        >
+        <Button type='submit' className='primary-button'>
           Submit
         </Button>
       </form>
