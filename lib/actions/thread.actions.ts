@@ -18,8 +18,8 @@ export async function createThread({
   communityId,
   path,
 }: Params) {
+  connectToDB();
   try {
-    connectToDB();
     const createdThread = await Thread.create({
       text,
       author,
@@ -73,4 +73,40 @@ export async function fetchThreads(pageNumber = 1, pageSize = 20) {
   const isNext = totalThreadsCount > skipAmount + threads.length;
 
   return { threads, isNext };
+}
+
+export async function fetchThreadById(id: string) {
+  connectToDB();
+  try {
+    const thread = await Thread.findById(id)
+      .populate({
+        path: 'author',
+        model: User,
+        select: '_id id name image',
+      })
+      .populate({
+        path: 'children',
+        populate: [
+          {
+            path: 'author',
+            model: User,
+            select: '_id id name parentId image',
+          },
+          {
+            path: 'children',
+            model: Thread,
+            populate: {
+              path: 'author',
+              model: User,
+              select: '_id id name parentId image',
+            },
+          },
+        ],
+      })
+      .exec();
+
+    return thread;
+  } catch (error: any) {
+    throw new Error(`Error fetching thread: ${error.message}`);
+  }
 }
